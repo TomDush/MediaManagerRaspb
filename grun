@@ -1,0 +1,1 @@
+go run *.go -stderrthreshold=INFO -v=3 -www /srv/raspbmm/www/ -roots /mnt/local/Media/
