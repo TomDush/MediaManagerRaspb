@@ -1,1 +1,1 @@
-go run *.go -stderrthreshold=INFO -v=3 -www /srv/raspbmm/www/ -roots /mnt/local/Media/
+go run *.go -stderrthreshold=INFO -v=3 -www /srv/raspbmm/www/ -roots  local:/mnt/local/Media/,unsafe:/mnt/unsafe

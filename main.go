@@ -29,17 +29,21 @@ func main() {
 
 		r := mux.NewRouter()
 		StaticController(r)
-		//MediaController(r)
+		err = BrowserController(r)
 
-		srv := &http.Server{
-			Handler:      r,
-			Addr:         mmConfig.HostAndPort(),
-			WriteTimeout: 15 * time.Second,
-			ReadTimeout:  15 * time.Second,
+		if err == nil {
+			srv := &http.Server{
+				Handler:      r,
+				Addr:         mmConfig.HostAndPort(),
+				WriteTimeout: 15 * time.Second,
+				ReadTimeout:  15 * time.Second,
+			}
+			srv.ListenAndServe()
 		}
-		srv.ListenAndServe()
 
-	} else {
+	}
+
+	if err != nil {
 		glog.Fatal("Can not start server: " + err.Error())
 	}
 }
@@ -50,7 +54,7 @@ func StaticController(r *mux.Router) {
 
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(mmConfig.www))))
 }
-func healthCheck(w http.ResponseWriter, r *http.Request) {
+func healthCheck(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprintf(w, "{\"status\": \"%s\"}", "OK")
 }
 
