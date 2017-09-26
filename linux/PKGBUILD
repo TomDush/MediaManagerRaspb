@@ -1,0 +1,29 @@
+# Maintainer: larte <lauri.arte@gmail.com>
+# Contributor: Maxwell Pray a.k.a. Synthead <synthead@gmail.com>
+
+pkgname=media-pi
+pkgdesc="Media PI is a light media manager for Raspberry PI"
+arch=('x86_64' 'armv7h')
+url="https://github.com/TomDush/media-pi"
+pkgver=0.1
+pkgrel=1
+license=('custom')
+depends=('systemd')
+
+source_armv7h=("https://s3-eu-west-1.amazonaws.com/dush-public/media-pi/media-pi-linux-arm.tar.gz")
+source_x86_64=("https://s3-eu-west-1.amazonaws.com/dush-public/media-pi/media-pi-linux-amd64.tar.gz")
+md5sums_armv7h=('SKIP')                                                                            
+md5sums_x86_64=('SKIP')                                                                          
+
+pkgver() {
+	printf "0.1_`cat VERSION`"
+}
+
+package() {
+	mkdir -p "$pkgdir/usr/bin"
+	cp media-pi "$pkgdir/usr/bin"
+
+    sysd="$pkgdir/usr/lib/systemd/system/"
+	mkdir -p "$sysd"
+	cp media-pi.service "$sysd"
+}                                                                     

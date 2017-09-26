@@ -1,0 +1,11 @@
+[Unit]
+Description=Media PI service start GO daemon
+Documentation=https://github.com/TomDush/media-pi
+After=network.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/media-pi -roots unsafe:/mnt/seed/,data:/mnt/data -stderrthreshold=INFO -port 80
