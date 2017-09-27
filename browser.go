@@ -17,12 +17,25 @@ import (
 var roots map[string]string = make(map[string]string)
 
 func BrowserController(r *mux.Router) error {
-	glog.V(1).Infoln("Registring Browser Controller")
+	glog.V(1).Infoln("Registering Browser Controller")
 
+	err := configure()
+	if err != nil {
+		return err
+	}
+
+	r.PathPrefix("/browser").HandlerFunc(ShowMedia)
+
+	glog.Infoln("Browser Controller config loaded. Roots are:", roots)
+	return nil
+}
+
+// Load roots configuration
+func configure() error {
 	config := GetMmConfig()
 	rootConfig := strings.Split(config.roots, ",")
 	if len(rootConfig) == 0 {
-		return fmt.Errorf("Media roots must be required (-root key1:/path,key2:/path/2) ")
+		return fmt.Errorf("Media roots must be required (-roots key1:/path,key2:/path/2) ")
 	}
 	for i := 0; i < len(rootConfig); i++ {
 		r := strings.Split(rootConfig[i], ":")
@@ -33,69 +46,153 @@ func BrowserController(r *mux.Router) error {
 		roots[r[0]] = r[1]
 	}
 
-	r.PathPrefix("/browser/").HandlerFunc(ShowMedia)
-	//mediaRouter := r.PathPrefix("/media/paths")
-	//mediaRouter.HandleFunc("/media/paths", FindAllRoots)
-	//r.HandleFunc("/media/paths", FindAllRoots)
-
-	glog.Infoln("Browser Controller config loaded. Roots are:", roots)
 	return nil
 }
 
+// Handle browsing request
 func ShowMedia(w http.ResponseWriter, r *http.Request) {
-	filesystemPath, root, relativePath := resolveRequestedFile(r)
-
-	parentPath := ""
-	if strings.Contains(relativePath, "/") {
-		parentPath = relativePath[:strings.LastIndex(relativePath, "/")]
-	}
-	parentUrl := url.URL{Scheme: "http", Host: r.Host, Path: "/browser/" + root + "/" + parentPath}
+	pathRequest := NewPathRequest(r)
 
 	var elem interface{}
+	var err error
 
-	stat, err := os.Stat(filesystemPath)
+	if pathRequest.IsIndex() {
+		publicUrl := pathRequest.PublicUrl()
+		index := Dir{Name: "Home", DetailUrl: publicUrl}
+		for root, _ := range roots {
+			index.Children = append(index.Children, Dir{Name: root, Root: root, DetailUrl: publicUrl + root})
+		}
+
+		elem = index
+	} else {
+		elem, err = BrowseTo(&pathRequest)
+	}
+
 	if err == nil {
-		if stat.IsDir() {
-			elem, err = newDir(root, relativePath, filesystemPath, parentUrl, r)
-
-		} else {
-			elem = newMedia(root, relativePath, parentUrl, r)
-		}
-
-		if err == nil {
-			err = respondWithJSON(w, 200, elem)
-		}
+		err = respondWithJSON(w, 200, elem)
 	}
 
 	if err != nil {
-		glog.Warning("Can't process path [", root, "]/", relativePath, ": ", err.Error())
+		glog.Warning("Fail to browse '", r.URL.Path, "': ", err.Error())
 		respondWithJSON(w, 500, map[string]string{"error": err.Error()})
 	}
 }
-func newMedia(root string, relativePath string, parentUrl url.URL, r *http.Request) Media {
-	media := Media{Root: root, Path: relativePath, Parent: parentUrl.String()}
-	glog.V(1).Infoln("Requested media: ", media.String())
 
-	play := url.URL{Scheme: "http", Host: r.Host, Path: "/player/play", RawQuery: "media=" + url.QueryEscape(fmt.Sprintf("%s/%s", root, relativePath))}
-	media.Play = play.String()
+// Instantiate a Media or a Dir depending on the targetted file.
+func BrowseTo(pathRequest *PathRequest) (interface{}, error) {
+	var elem interface{}
 
-	return media
+	glog.V(2).Infoln("Stats of ", pathRequest.LocalPath())
+	stat, err := os.Stat(pathRequest.LocalPath())
+	if err == nil {
+		if stat.IsDir() {
+			glog.V(1).Infoln("Browse directory ", pathRequest.LocalPath())
+			elem, err = NewDir(pathRequest)
+
+		} else {
+			glog.V(1).Infoln("Get media details: ", pathRequest.LocalPath())
+			elem = newMediaFromRequest(pathRequest)
+		}
+	}
+
+	return elem, err
 }
 
-func newDir(root string, relativePath string, filesystemPath string, parentUrl url.URL, r *http.Request) (dir Dir, err error) {
-	dir = Dir{Root: root, Path: relativePath, filesystemPath: filesystemPath, Parent: parentUrl.String()}
+// Parsed URL with convenient method to regenerate URL, partial path, ...
+type PathRequest struct {
+	Host string
 
-	files, err := ioutil.ReadDir(dir.filesystemPath)
+	Root         string
+	Name         string
+	RelativePath string
+
+	// Absolute local path
+	localPath string
+}
+
+func NewPathRequest(request *http.Request) PathRequest {
+	r := PathRequest{}
+
+	r.Host = request.Host
+
+	r.ParsePath(strings.Trim(strings.TrimPrefix(request.URL.Path, "/browser"), "/"))
+
+	return r
+}
+
+// Parse file public path and resolve its internal path
+func (r *PathRequest) ParsePath(publicPath string) {
+	if strings.Contains(publicPath, "/") {
+		firstSlash := strings.Index(publicPath, "/")
+		lastSlash := strings.LastIndex(publicPath, "/")
+
+		r.Root = publicPath[:firstSlash]
+		if firstSlash < lastSlash {
+			r.RelativePath = publicPath[firstSlash+1:lastSlash]
+		}
+		r.Name = publicPath[lastSlash+1:]
+
+	} else if publicPath != "" {
+		// Simple root
+		r.Root = publicPath
+	}
+	// else it's browser index
+}
+func (r *PathRequest) LocalPath() string {
+	if r.localPath == "" {
+		r.localPath = joinNotEmpty([]string{roots[r.Root], r.RelativePath, r.Name}, "/")
+	}
+
+	return r.localPath
+}
+func (r *PathRequest) IsIndex() bool {
+	return r.Root == ""
+}
+func (r *PathRequest) PublicPath() string {
+	return joinNotEmpty([]string{r.Root, r.RelativePath, r.Name}, "/")
+}
+func (r *PathRequest) PublicUrl() string {
+	publicUrl := url.URL{Scheme: "http", Host: r.Host, Path: "/browser/" + r.PublicPath()}
+	return publicUrl.String()
+}
+func (r *PathRequest) ParentPublicUrl() string {
+	publicUrl := url.URL{Scheme: "http", Host: r.Host, Path: joinNotEmpty([]string{"/browser", r.Root, r.RelativePath}, "/")}
+	if r.IsRoot() {
+		publicUrl = url.URL{Scheme: "http", Host: r.Host, Path: "/browser"}
+	}
+	return publicUrl.String()
+}
+func (r *PathRequest) IsRoot() bool {
+	return r.Root != "" && r.Name == ""
+}
+
+type Dir struct {
+	Name      string
+	Root      string
+	localPath string
+
+	ParentUrl string
+	DetailUrl string
+
+	Children []interface{}
+}
+
+func NewDir(r *PathRequest) (dir Dir, err error) {
+	dir = Dir{Root: r.Root, localPath: r.localPath, Name: r.Name}
+	dir.DetailUrl = r.PublicUrl()
+	dir.ParentUrl = r.ParentPublicUrl()
+
+	files, err := ioutil.ReadDir(r.localPath)
 
 	if err == nil {
 		for _, file := range files {
-			detailUrl := url.URL{Scheme: "http", Host: r.Host, Path: "/browser/" + root + "/" + relativePath + "/" + file.Name()}
-			parent := url.URL{Scheme: "http", Host: r.Host, Path: "/browser/" + root + "/" + relativePath}
+			detailUrl := dir.DetailUrl + "/" + file.Name()
+			parent := dir.DetailUrl
 
 			if file.IsDir() {
-				dir.Children = append(dir.Children, Dir{Root: root, Path: relativePath + "/" + file.Name(), Details: detailUrl.String(), Parent: parent.String()})
+				dir.Children = append(dir.Children, Dir{Root: r.Root, Name: file.Name(), DetailUrl: detailUrl, ParentUrl: parent})
 			} else {
-				dir.Children = append(dir.Children, Media{Root: root, Path: relativePath + "/" + file.Name(), Details: detailUrl.String(), Parent: parent.String()})
+				dir.Children = append(dir.Children, newMedia(r.Root, joinNotEmpty([]string{r.RelativePath, r.Name}, "/"), file.Name(), r.Host))
 			}
 		}
 	}
@@ -103,17 +200,33 @@ func newDir(root string, relativePath string, filesystemPath string, parentUrl u
 	return dir, err
 }
 
-func resolveRequestedFile(r *http.Request) (string, string, string) {
-	name := strings.TrimPrefix(r.URL.Path, "/browser/")
-	glog.V(2).Infoln("Browsing to path: ", name)
-	var relativePath string
-	path := strings.Split(name, "/")
-	for i := 1; i < len(path); i++ {
-		relativePath += "/" + path[i]
-	}
-	root := path[0]
+type Media struct {
+	Root      string
+	Name      string
+	localPath string
 
-	return roots[root] + relativePath, strings.Trim(root, "/"), strings.Trim(relativePath, "/")
+	ParentUrl string
+	DetailUrl string
+	PlayUrl   string
+}
+
+func newMedia(root string, relativePath string, name string, host string) Media {
+
+	media := Media{Root: root, Name: name, localPath: joinNotEmpty([]string{roots[root], relativePath, name}, "/")}
+
+	parentUrl := url.URL{Scheme: "http", Host: host, Path: joinNotEmpty([]string{"/browser/", root, relativePath}, "/")}
+	media.ParentUrl = parentUrl.String()
+	media.DetailUrl = parentUrl.String() + "/" + name
+
+	publicPath := joinNotEmpty([]string{root, relativePath, name}, "/")
+	play := url.URL{Scheme: "http", Host: host, Path: "/player/play", RawQuery: "media=" + url.QueryEscape(publicPath)}
+	media.PlayUrl = play.String()
+
+	return media
+
+}
+func newMediaFromRequest(r *PathRequest) Media {
+	return newMedia(r.Root, r.RelativePath, r.Name, r.Host)
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) error {
@@ -129,30 +242,25 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) error
 	return err
 }
 
-type Dir struct {
-	Root           string
-	Path           string
-	filesystemPath string
-
-	Parent  string
-	Details string
-
-	Children []interface{}
-}
-
-type Media struct {
-	Root string
-	Path string
-	filesystemPath string
-
-	Parent  string
-	Details string
-	Play string
-}
-
 func (m *Media) String() string {
-	return fmt.Sprintf("%s [root=%s]", m.Path, m.Root)
+	return fmt.Sprintf("%s (%s)", m.Name, m.localPath)
 }
 func (m *Dir) String() string {
-	return fmt.Sprintf("%s [root=%s, %d children]", m.filesystemPath, m.Root, len(m.Children))
+	return fmt.Sprintf("%s (%s) - %d children", m.Name, m.localPath, len(m.Children))
+}
+
+// strings.Join, but without empty values
+func joinNotEmpty(values []string, separator string) string {
+	var res string
+	for _, val := range values {
+		if val != "" {
+			if res != "" {
+				res += "/"
+			}
+
+			res += val
+		}
+	}
+
+	return res
 }
