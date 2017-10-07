@@ -30,6 +30,9 @@ func main() {
 		r := mux.NewRouter()
 		StaticController(r)
 		err = BrowserController(r)
+		if err == nil {
+			err = PayerController(r)
+		}
 
 		if err == nil {
 			srv := &http.Server{
