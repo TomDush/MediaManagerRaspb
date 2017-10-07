@@ -15,6 +15,7 @@ import (
 )
 
 var roots map[string]string = make(map[string]string)
+const BROWSER_PREFIX = "/api/browser"
 
 func BrowserController(r *mux.Router) error {
 	glog.V(1).Infoln("Registering Browser Controller")
@@ -24,7 +25,7 @@ func BrowserController(r *mux.Router) error {
 		return err
 	}
 
-	r.PathPrefix("/browser").HandlerFunc(ShowMedia)
+	r.PathPrefix(BROWSER_PREFIX).HandlerFunc(ShowMedia)
 
 	glog.Infoln("Browser Controller config loaded. Roots are:", roots)
 	return nil
@@ -115,7 +116,7 @@ func NewPathRequest(request *http.Request) PathRequest {
 
 	r.Host = request.Host
 
-	r.ParsePath(strings.Trim(strings.TrimPrefix(request.URL.Path, "/browser"), "/"))
+	r.ParsePath(strings.Trim(strings.TrimPrefix(request.URL.Path, BROWSER_PREFIX), "/"))
 
 	return r
 }
@@ -152,13 +153,13 @@ func (r *PathRequest) PublicPath() string {
 	return joinNotEmpty([]string{r.Root, r.RelativePath, r.Name}, "/")
 }
 func (r *PathRequest) PublicUrl() string {
-	publicUrl := url.URL{Scheme: "http", Host: r.Host, Path: "/browser/" + r.PublicPath()}
+	publicUrl := url.URL{Scheme: "http", Host: r.Host, Path: BROWSER_PREFIX + "/" + r.PublicPath()}
 	return publicUrl.String()
 }
 func (r *PathRequest) ParentPublicUrl() string {
-	publicUrl := url.URL{Scheme: "http", Host: r.Host, Path: joinNotEmpty([]string{"/browser", r.Root, r.RelativePath}, "/")}
+	publicUrl := url.URL{Scheme: "http", Host: r.Host, Path: joinNotEmpty([]string{BROWSER_PREFIX, r.Root, r.RelativePath}, "/")}
 	if r.IsRoot() {
-		publicUrl = url.URL{Scheme: "http", Host: r.Host, Path: "/browser"}
+		publicUrl = url.URL{Scheme: "http", Host: r.Host, Path: BROWSER_PREFIX}
 	}
 	return publicUrl.String()
 }
@@ -167,14 +168,14 @@ func (r *PathRequest) IsRoot() bool {
 }
 
 type Dir struct {
-	Name      string
-	Root      string
-	localPath string
+	Name      string `json:"name"`
+	Root      string `json:"root,omitempty"`
+	localPath string `json:"localPath,omitempty"`
 
-	ParentUrl string
-	DetailUrl string
+	ParentUrl string `json:"parentUrl,omitempty"`
+	DetailUrl string `json:"detailUrl"`
 
-	Children []interface{}
+	Children []interface{}  `json:"children,omitempty"`
 }
 
 func NewDir(r *PathRequest) (dir Dir, err error) {
@@ -201,20 +202,20 @@ func NewDir(r *PathRequest) (dir Dir, err error) {
 }
 
 type Media struct {
-	Root      string
-	Name      string
-	localPath string
+	Root      string `json:"root"`
+	Name      string `json:"name"`
+	localPath string `json:"localPath"`
 
-	ParentUrl string
-	DetailUrl string
-	PlayUrl   string
+	ParentUrl string `json:"parentUrl,omitempty"`
+	DetailUrl string `json:"detailUrl"`
+	PlayUrl   string `json:"playUrl,omitempty"`
 }
 
 func newMedia(root string, relativePath string, name string, host string) Media {
 
 	media := Media{Root: root, Name: name, localPath: joinNotEmpty([]string{roots[root], relativePath, name}, "/")}
 
-	parentUrl := url.URL{Scheme: "http", Host: host, Path: joinNotEmpty([]string{"/browser/", root, relativePath}, "/")}
+	parentUrl := url.URL{Scheme: "http", Host: host, Path: joinNotEmpty([]string{BROWSER_PREFIX + "/", root, relativePath}, "/")}
 	media.ParentUrl = parentUrl.String()
 	media.DetailUrl = parentUrl.String() + "/" + name
 
