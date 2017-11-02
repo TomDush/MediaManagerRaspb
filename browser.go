@@ -15,6 +15,7 @@ import (
 )
 
 var roots map[string]string = make(map[string]string)
+
 const BROWSER_PREFIX = "/api/browser"
 
 func BrowserController(r *mux.Router) error {
@@ -61,7 +62,7 @@ func ShowMedia(w http.ResponseWriter, r *http.Request) {
 		publicUrl := pathRequest.PublicUrl()
 		index := Dir{Name: "Home", DetailUrl: publicUrl}
 		for root, _ := range roots {
-			index.Children = append(index.Children, Dir{Name: root, Root: root, DetailUrl: publicUrl + root})
+			index.Children = append(index.Children, Dir{Name: root, Root: root, DetailUrl: publicUrl + root, PathId: root})
 		}
 
 		elem = index
@@ -170,18 +171,29 @@ func (r *PathRequest) IsRoot() bool {
 type Dir struct {
 	Name      string `json:"name"`
 	Root      string `json:"root,omitempty"`
+	PathId    string `json:"pathId"`
 	localPath string `json:"localPath,omitempty"`
+	ParentId  string `json:"parentId,omitempty"`
 
 	ParentUrl string `json:"parentUrl,omitempty"`
 	DetailUrl string `json:"detailUrl"`
 
-	Children []interface{}  `json:"children,omitempty"`
+	Children []interface{} `json:"children,omitempty"`
 }
 
 func NewDir(r *PathRequest) (dir Dir, err error) {
-	dir = Dir{Root: r.Root, localPath: r.localPath, Name: r.Name}
+	parentId := joinNotEmpty([]string{r.Root, r.RelativePath}, "/")
+	if r.IsRoot() {
+		parentId = ""
+	}
+
+	dir = Dir{Root: r.Root, localPath: r.localPath, Name: r.Name, PathId: joinNotEmpty([]string{r.Root, r.RelativePath, r.Name}, "/"), ParentId: parentId}
 	dir.DetailUrl = r.PublicUrl()
 	dir.ParentUrl = r.ParentPublicUrl()
+
+	if r.IsRoot() {
+		dir.Name = r.Root
+	}
 
 	files, err := ioutil.ReadDir(r.localPath)
 
@@ -189,9 +201,10 @@ func NewDir(r *PathRequest) (dir Dir, err error) {
 		for _, file := range files {
 			detailUrl := dir.DetailUrl + "/" + file.Name()
 			parent := dir.DetailUrl
+			pathId := joinNotEmpty([]string{r.Root, r.RelativePath, r.Name, file.Name()}, "/")
 
 			if file.IsDir() {
-				dir.Children = append(dir.Children, Dir{Root: r.Root, Name: file.Name(), DetailUrl: detailUrl, ParentUrl: parent})
+				dir.Children = append(dir.Children, Dir{Root: r.Root, Name: file.Name(), DetailUrl: detailUrl, ParentUrl: parent, PathId: pathId, ParentId: dir.PathId})
 			} else {
 				dir.Children = append(dir.Children, newMedia(r.Root, joinNotEmpty([]string{r.RelativePath, r.Name}, "/"), file.Name(), r.Host))
 			}
@@ -204,7 +217,9 @@ func NewDir(r *PathRequest) (dir Dir, err error) {
 type Media struct {
 	Root      string `json:"root"`
 	Name      string `json:"name"`
+	PathId    string `json:"pathId"`
 	localPath string `json:"localPath"`
+	ParentId  string `json:"parentId,omitempty"`
 
 	ParentUrl string `json:"parentUrl,omitempty"`
 	DetailUrl string `json:"detailUrl"`
@@ -213,7 +228,7 @@ type Media struct {
 
 func newMedia(root string, relativePath string, name string, host string) Media {
 
-	media := Media{Root: root, Name: name, localPath: joinNotEmpty([]string{roots[root], relativePath, name}, "/")}
+	media := Media{Root: root, Name: name, localPath: joinNotEmpty([]string{roots[root], relativePath, name}, "/"), PathId: joinNotEmpty([]string{root, relativePath, name}, "/"), ParentId: joinNotEmpty([]string{root, relativePath}, "/")}
 
 	parentUrl := url.URL{Scheme: "http", Host: host, Path: joinNotEmpty([]string{BROWSER_PREFIX + "/", root, relativePath}, "/")}
 	media.ParentUrl = parentUrl.String()

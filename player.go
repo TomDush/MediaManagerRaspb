@@ -10,7 +10,7 @@ import (
 func PayerController(r *mux.Router) error {
 
 	glog.V(1).Infoln("Registering Player Controller")
-	r.PathPrefix("/player/play").HandlerFunc(PlayMedia)
+	r.PathPrefix("/api/player/play").HandlerFunc(PlayMedia)
 
 	return nil
 }
