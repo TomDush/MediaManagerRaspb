@@ -118,7 +118,7 @@ func (c *MmConfig) IsValid() error {
 	return err
 }
 func (c *MmConfig) HostAndPort() string {
-	return fmt.Sprintf("localhost:%d", c.port)
+	return fmt.Sprintf(":%d", c.port)
 }
 func (c *MmConfig) String() string {
 	return fmt.Sprintf("MmCOnfig[port=%d, www=%s, roots=%s, HostAndPort=%s]", c.port, c.www, c.roots, c.HostAndPort())
