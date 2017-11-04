@@ -8,6 +8,8 @@ import (
 
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 )
 
 var mmConfig *MmConfig
@@ -28,11 +30,11 @@ func main() {
 		glog.Infoln("Bootstraping MediaManager designed for Raspberries...")
 
 		r := mux.NewRouter()
-		StaticController(r)
 		err = BrowserController(r)
 		if err == nil {
 			err = PayerController(r)
 		}
+		StaticController(r)
 
 		if err == nil {
 			srv := &http.Server{
@@ -51,16 +53,55 @@ func main() {
 	}
 }
 
+// Serve static files and /heath
 func StaticController(r *mux.Router) {
 	glog.V(1).Infoln("Add static controller endpoints")
 	r.HandleFunc("/health", healthCheck)
 
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(mmConfig.www))))
+	r.PathPrefix("/").HandlerFunc(WrapperFallBackIndex)
 }
+// Always answer OK ;)
 func healthCheck(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprintf(w, "{\"status\": \"%s\"}", "OK")
 }
 
+var delegate http.Handler
+
+// Wrap FileServer handler to serve index.html when file isn't found. (HTML5 routing)
+func WrapperFallBackIndex(writer http.ResponseWriter, request *http.Request) {
+	if delegate == nil {
+		delegate = http.FileServer(http.Dir(mmConfig.www))
+	}
+
+	path := request.URL.Path
+	_, err := os.Stat(mmConfig.www + path)
+	if len(path) != 0 && path != "/" && err != nil {
+		if ext(path) == "" {
+			glog.V(1).Info("Serve 'index.html' for requested path: '" + path + "' is ")
+			request.URL.Path = "/"
+		}
+	}
+
+	delegate.ServeHTTP(writer, request)
+}
+
+// Extract extension from path. Empty string when not found.
+func ext(path string) string {
+	if len(path) == 0 {
+		return ""
+	}
+
+	slashIndex := strings.LastIndex(path, "/")
+	dotIndex := strings.LastIndex(path, ".")
+
+	if dotIndex <= slashIndex {
+		return ""
+	}
+
+	return path[dotIndex+1:]
+}
+
+// Application configuration: port, static files and exposed directories
 type MmConfig struct {
 	port  int
 	roots string
