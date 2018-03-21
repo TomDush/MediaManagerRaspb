@@ -5,6 +5,7 @@ import (
 	"github.com/golang/glog"
 	"net/http"
 	"os/exec"
+	"strings"
 )
 
 func PayerController(r *mux.Router) error {
@@ -27,8 +28,27 @@ func PlayMedia(w http.ResponseWriter, r *http.Request) {
 	//
 	//media.Play()
 }
+
 func (m *Media) Play() error{
 	// TODO mage error, test if file exist...
 	//return exec.Command("mplayer", m.localPath).Run()
 	return exec.Command("omxplayer", "-o", "hdmi", m.path.localPath).Run()
 }
+
+// Assert if media is playable
+func (m *Media) IsPlayable() bool {
+	dots := strings.Split(m.Path().Name, ".")
+	ext := strings.ToLower(dots[len(dots)-1])
+
+	readable := []string{"mkv", "mp4", "avi"}
+
+	// Not slice.contains!?
+	for _, e := range readable {
+		if e == ext {
+			return true
+		}
+	}
+	return false
+}
+
+

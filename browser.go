@@ -28,20 +28,56 @@ func BrowserController(r *mux.Router) error {
 
 // Handle browsing request
 func ShowMedia(w http.ResponseWriter, r *http.Request) {
-	path, err := parsePath(r)
-	if err != nil {
-		failureResponse(r, err, w)
+	path, err1 := parsePath(r)
+	if err1 != nil {
+		failureResponse(r, err1, w)
 	}
 
-	file, err := path.ToFile(false)
-	if err != nil {
-		failureResponse(r, err, w)
+	file, err2 := path.ToFile(false)
+	if err2 != nil {
+		failureResponse(r, err1, w)
 	}
 
-	if err == nil {
-		respondWithJSON(w, 200, file)
+	if err1 == nil && err2 == nil {
+		respondWithJSON(w, 200, NewFileDto(file))
 	}
 }
+
+type FileDto struct {
+	Type     string `json:"type"`
+	PathId   string `json:"pathId"`
+	ParentId string `json:"parentId"`
+	Name     string `json:"name"`
+
+	// Specific for directories
+	Children []FileDto `json:"children,omitempty"`
+
+	// Specific to Media
+	Playable bool `json:"playable"`
+}
+
+func NewFileDto(file File) FileDto {
+	dto := FileDto{
+		Type:     file.Type(),
+		PathId:   file.Path().PathId(),
+		ParentId: file.Path().ParentId(),
+		Name:     file.Path().DisplayName(),
+	}
+
+	if dir, ok := file.(*Dir); ok {
+		dto.Children = make([]FileDto, len(dir.Children))
+		for i, c := range dir.Children {
+			dto.Children[i] = NewFileDto(c)
+		}
+	}
+
+	if media, ok := file.(*Media); ok {
+		dto.Playable = media.IsPlayable()
+	}
+
+	return dto
+}
+
 func failureResponse(r *http.Request, err error, w http.ResponseWriter) {
 	glog.Warning("Fail to browse '", r.URL.Path, "': ", err.Error())
 	respondWithJSON(w, 500, map[string]string{"error": err.Error()})

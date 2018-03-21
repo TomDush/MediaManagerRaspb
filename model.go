@@ -6,6 +6,7 @@ import (
 	"strings"
 	"github.com/golang/glog"
 	"os"
+	"sort"
 )
 
 var roots = make(map[string]Path)
@@ -40,15 +41,31 @@ type Path struct {
 func NewPath(root string, path string, name string) (Path, error) {
 	// TODO error when path doesn't exist
 	empty := Path{}
-	if roots[root] == empty {
+	if root == "" && path == "" && name == "" {
+		return empty, nil
+
+	} else if roots[root] == empty {
 		return empty, fmt.Errorf("invalid root: %s", root)
 	}
+
 	return Path{localPath: joinNotEmpty([]string{roots[root].localPath, path, name}, "/"), Root: root, MiddlePath: path, Name: name}, nil
 }
 
 // ID used from outside
 func (path *Path) PathId() string {
 	return joinNotEmpty([]string{path.Root, path.MiddlePath, path.Name}, "/")
+}
+
+// ID of parent directory used from outside
+func (path *Path) ParentId() string {
+	return joinNotEmpty([]string{path.Root, path.MiddlePath}, "/")
+}
+func (path *Path) DisplayName() string {
+	name := path.Name
+	if name == "" {
+		name = path.Root
+	}
+	return name
 }
 func (path *Path) IsIndex() bool {
 	return path.Root == ""
@@ -92,19 +109,23 @@ func (path *Path) ToFile(summarised bool) (File, error) {
 }
 
 type File interface {
-	Path() Path
+	Path() *Path
 
 	IsDir() bool
+	Type() string
 }
 type FileBase struct {
-	path Path `json:"path"`
+	path Path
 }
 
-func (fileBase *FileBase) Path() Path {
-	return fileBase.path
+func (fileBase *FileBase) Path() *Path {
+	return &fileBase.path
 }
 func (*FileBase) IsDir() bool {
 	return false
+}
+func (fileBase *FileBase) String() string {
+	return fmt.Sprintf("%s (%s)", fileBase.Path().Name, fileBase.Path().localPath)
 }
 
 type Dir struct {
@@ -115,6 +136,9 @@ type Dir struct {
 
 func (*Dir) IsDir() bool {
 	return true
+}
+func (*Dir) Type() string {
+	return "dir"
 }
 
 // Simple constructor
@@ -141,18 +165,42 @@ func (dir *Dir) loadChildren() error {
 		dir.Children = append(dir.Children, f)
 	}
 
+	// And sort ny name
+	sort.Sort(&dirSorter{dir.Children})
+
 	return nil
 }
+
+// Utilities to sort files within a Dir
+type dirSorter struct {
+	files []File
+}
+
+// Len is part of sort.Interface.
+func (s *dirSorter) Len() int {
+	return len(s.files)
+}
+
+// Swap is part of sort.Interface.
+func (s *dirSorter) Swap(i, j int) {
+	s.files[i], s.files[j] = s.files[j], s.files[i]
+}
+
+// Less is part of sort.Interface.
+func (s *dirSorter) Less(i, j int) bool {
+	return strings.ToLower(s.files[i].Path().Name) < strings.ToLower(s.files[j].Path().Name)
+}
+
 
 type Media struct {
 	FileBase
 }
 
+func (*Media) Type() string {
+	return "media"
+}
+
 // Simple constructor
 func NewMedia(path Path) *Media {
 	return &Media{FileBase: FileBase{path: path}}
-}
-
-func (fileBase *FileBase) String() string {
-	return fmt.Sprintf("%s (%s)", fileBase.Path().Name, fileBase.Path().localPath)
 }

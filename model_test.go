@@ -171,6 +171,8 @@ func TestPath_ToFile(t *testing.T) {
 	}{
 		{"working dir is a directory that contains model_test.go", fields{"", ""}, args{false}, is.AllOf(
 			IsDir(is.True()), HasChild(AnyMatch(HasName(is.EqualTo("model_test.go"))))), false},
+		{"working dir is a directory without children when summarised", fields{"", ""}, args{true}, is.AllOf(
+			IsDir(is.True()), is.Not(HasChild(AnyMatch(HasName(is.EqualTo("model_test.go")))))), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
