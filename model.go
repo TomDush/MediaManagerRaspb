@@ -75,6 +75,15 @@ func (path *Path) Relative(name string) Path {
 	p, _ := NewPath(path.Root, joinNotEmpty([]string{path.MiddlePath, path.Name}, "/"), name)
 	return p
 }
+
+// Extract and return file extension (after last dot, or file name if no dot)
+func (path *Path) Ext() string {
+	dots := strings.Split(path.Name, ".")
+	if len(dots) == 1 {
+		return ""
+	}
+	return strings.ToLower(dots[len(dots)-1])
+}
 func (path *Path) ToFile(summarised bool) (File, error) {
 	if path.IsIndex() {
 		// List available "roots"

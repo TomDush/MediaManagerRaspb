@@ -35,7 +35,7 @@ func ShowMedia(w http.ResponseWriter, r *http.Request) {
 
 	file, err2 := path.ToFile(false)
 	if err2 != nil {
-		failureResponse(r, err1, w)
+		failureResponse(r, err2, w)
 	}
 
 	if err1 == nil && err2 == nil {
@@ -72,7 +72,7 @@ func NewFileDto(file File) FileDto {
 	}
 
 	if media, ok := file.(*Media); ok {
-		dto.Playable = media.IsPlayable()
+		dto.Playable = IsPlayable(media)
 	}
 
 	return dto
@@ -85,25 +85,30 @@ func failureResponse(r *http.Request, err error, w http.ResponseWriter) {
 
 // Parse file public path and resolve its internal path
 func parsePath(request *http.Request) (Path, error) {
-	publicPath := strings.Trim(strings.TrimPrefix(request.URL.Path, BROWSER_PREFIX), "/")
+	fileId := strings.Trim(strings.TrimPrefix(request.URL.Path, BROWSER_PREFIX), "/")
 
+	return NewPathFromId(fileId)
+}
+
+// Create new Path from its fileId
+func NewPathFromId(fileId string) (Path, error) {
 	var root string
 	var relativePath string
 	var name string
 
-	if strings.Contains(publicPath, "/") {
-		firstSlash := strings.Index(publicPath, "/")
-		lastSlash := strings.LastIndex(publicPath, "/")
+	if strings.Contains(fileId, "/") {
+		firstSlash := strings.Index(fileId, "/")
+		lastSlash := strings.LastIndex(fileId, "/")
 
-		root = publicPath[:firstSlash]
+		root = fileId[:firstSlash]
 		if firstSlash < lastSlash {
-			relativePath = publicPath[firstSlash+1:lastSlash]
+			relativePath = fileId[firstSlash+1 : lastSlash]
 		}
-		name = publicPath[lastSlash+1:]
+		name = fileId[lastSlash+1:]
 
-	} else if publicPath != "" {
+	} else if fileId != "" {
 		// Simple root
-		root = publicPath
+		root = fileId
 	}
 	// else it's browser index
 

@@ -1,14 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"reflect"
 	"testing"
-	"os"
-	"github.com/golang/glog"
-	"github.com/corbym/gocrest/is"
+
 	"github.com/corbym/gocrest"
+	"github.com/corbym/gocrest/is"
 	"github.com/corbym/gocrest/then"
-	"fmt"
+	"github.com/golang/glog"
 )
 
 func TestNewPath(t *testing.T) {
@@ -250,4 +251,37 @@ func AnyMatch(matcher *gocrest.Matcher) *gocrest.Matcher {
 	}
 
 	return any
+}
+
+func TestPath_Ext(t *testing.T) {
+	type fields struct {
+		localPath  string
+		Root       string
+		MiddlePath string
+		Name       string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{"extension in the name is captured", fields{"/mnt/data/foo/bar.MP4", "data", "foo", "bar.mp4"}, "mp4"},
+		{"extension in the name is captured, even if several dots", fields{"/mnt/data/foo.baz/bar.mp4", "data", "foo.baz", "bar.mp4"}, "mp4"},
+		{"no extension give empty string", fields{"/mnt/data/foo/bar", "data", "foo", "bar"}, ""},
+		{"simple root dir doesn't have extension", fields{"/mnt/data", "data", "", ""}, ""},
+		{"simple root dir doesn't have extension (even if dot is present)", fields{"/mnt/data.foo", "data", "", ""}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := &Path{
+				localPath:  tt.fields.localPath,
+				Root:       tt.fields.Root,
+				MiddlePath: tt.fields.MiddlePath,
+				Name:       tt.fields.Name,
+			}
+			if got := path.Ext(); got != tt.want {
+				t.Errorf("Path.Ext() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
