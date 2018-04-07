@@ -37,6 +37,10 @@ func main() {
 		glog.Fatal("Can not start server: " + err.Error())
 	}
 
+	if err := SearchController(r); err != nil {
+		glog.Fatal("Can not start server: " + err.Error())
+	}
+
 	if err := StaticController(r); err != nil {
 		glog.Fatal("Can not start server: " + err.Error())
 	}

@@ -16,7 +16,7 @@ func ConfigureRoots() error {
 	config := GetMmConfig()
 	rootConfig := strings.Split(config.roots, ",")
 	if len(rootConfig) == 0 {
-		return fmt.Errorf("Media roots must be required (-roots key1:/path,key2:/path/2) ")
+		return fmt.Errorf("Media roots is required (-roots key1:/path,key2:/path/2) ")
 	}
 	for i := 0; i < len(rootConfig); i++ {
 		r := strings.Split(rootConfig[i], ":")
