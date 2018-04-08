@@ -9,17 +9,18 @@ import (
 
 var mainDispatcher *PlayerDispatcher
 
-func PayerController(r *mux.Router) error {
+func PlayerController(r *mux.Router) error {
 	glog.V(1).Infoln("Registering Player Controller")
 
 	mainDispatcher = NewPlayerDispatcher(NewOmxPlayer())
 	go mainDispatcher.StartDispatching()
 
 	// explicitly list commands that are accepted
-	for _, acceptableCmd := range []string{"play", "pause", "stop", "forward", "backward"} {
+	for _, acceptableCmd := range []string{"play", "pause", "stop", "forward", "backward", "bigForward", "bigBackward"} {
 		r.PathPrefix("/api/player/" + acceptableCmd).HandlerFunc(commandHandler(mainDispatcher, acceptableCmd))
 	}
 
+	glog.Info("Player controller loaded with ", len(mainDispatcher.Players), " players")
 	return nil
 }
 
@@ -145,20 +146,24 @@ func (d *PlayerDispatcher) StartDispatching() {
 			glog.Info("Processing command ", command)
 
 			if command.File != nil {
+				// can start/replace a player
 				previousPlayer := d.currentPlayer
 
 				d.currentPlayer = d.findAppropriatePlayer(command.File)
 
 				if previousPlayer != nil && previousPlayer != d.currentPlayer {
-					fmt.Println("Sending STOP to previous player")
-					previousPlayer.Execute(NewPlayerCommand("stop"))
-				}
-				if d.currentPlayer != nil {
-					d.currentPlayer.Execute(command)
+					glog.Info("STOPPING previous player")
+					if err := previousPlayer.Execute(NewPlayerCommand("stop")); err != nil {
+						glog.Warning("Can't send STOP to running player: ", err)
+					}
 				}
 
-			} else if d.currentPlayer != nil {
-				d.currentPlayer.Execute(command)
+			}
+
+			if d.currentPlayer != nil {
+				if err := d.currentPlayer.Execute(command); err != nil {
+					glog.Error("Player rejected command ", command, ":", err)
+				}
 			}
 
 		case <-d.stopIt:
@@ -182,6 +187,7 @@ func (d *PlayerDispatcher) StopDispatching() {
 	}
 }
 
+// return first player accepting requested type of file
 func (d *PlayerDispatcher) findAppropriatePlayer(file File) Player {
 	ext := file.Path().Ext()
 	for _, p := range d.Players {
