@@ -6,11 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang/glog"
+	"io"
+	"bufio"
+	"regexp"
+	"strconv"
 )
 
 type OmxPlayer struct {
-	process *exec.Cmd
-	playing File
+	instance *omxPlaying
 }
 
 func NewOmxPlayer() *OmxPlayer {
@@ -24,30 +27,108 @@ func (player *OmxPlayer) Accept(ext string) bool {
 }
 
 func (player *OmxPlayer) Execute(command PlayerCommand) error {
-	playCmd := command.Operation == "play" && command.File != nil && (player.playing == nil || command.File.Path() != player.playing.Path())
+	// New play, or play of another media
+	playCmd := command.Operation == "play" && command.File != nil && (player.instance == nil || command.File.Path() != player.instance.playing.Path())
 
-	if command.Operation == "stop" || playCmd {
-		if player.process != nil {
-			in, err := player.process.StdinPipe()
-			if err != nil {
-				return err
-			}
-			in.Write([]byte{'s'})
+	if player.instance != nil {
+		// Commands on current play instance
+
+		ope := command.Operation
+		switch {
+		case ope == "stop" || playCmd:
+			glog.Info("Stopping ", player.instance.playing.Path().localPath)
+			player.instance.omxExec('q')
+
+		case ope == "pause":
+			player.instance.omxExec('p')
+
+		case ope == "forward":
+			player.instance.omxExec('\033', '[', 'C')
+
+		case ope == "backward":
+			player.instance.omxExec('\033', '[', 'D')
+
+		case ope == "bigForward":
+			player.instance.omxExec('\033', '[', 'A')
+
+		case ope == "bigBackward":
+			player.instance.omxExec('\033', '[', 'B')
 		}
 	}
 
 	if playCmd {
 		glog.Info("Start to play ", command.File.Path().localPath)
-		player.playing = command.File
-		player.process = exec.Command("omxplayer", "-player", "hdmi", command.File.Path().localPath)
 
-		if err := player.process.Start(); err != nil {
+		process := exec.Command("omxplayer", "-o", "hdmi", command.File.Path().localPath)
+		reader, writer := io.Pipe()
+		process.Stdout = writer
+		process.Stderr = writer
+
+		player.instance = &omxPlaying{
+			playing: command.File,
+			process: process,
+		}
+
+		// Start listening for updates (position in media)
+		go player.instance.readOutput(bufio.NewScanner(reader))
+
+		var err error
+		if player.instance.stdin, err = process.StdinPipe(); err != nil {
 			return err
 		}
 
-		// TODO Listen for omx updates
-
+		if err := process.Start(); err != nil {
+			return err
+		}
 	}
 
 	return errors.New(fmt.Sprintf("Command %s is not implemented by OmxPlayer adapter.", command))
+}
+
+// Playing instance of OMX Player
+type omxPlaying struct {
+	process  *exec.Cmd
+	playing  File
+	stdin    io.WriteCloser
+	position *RelativePosition
+}
+
+// Pass a command (key) to OMX Player
+func (player *omxPlaying) omxExec(key ...byte) {
+	player.stdin.Write(key)
+}
+
+// Read OMX Player output
+func (player *omxPlaying) readOutput(scanner *bufio.Scanner) {
+	scanner.Split(bufio.ScanLines)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if strings.HasPrefix(line, "seek") {
+			player.position = NewOmxRelativePosition(line)
+		}
+	}
+}
+
+// Parse "seek" line from OMX Player output
+func NewOmxRelativePosition(position string) *RelativePosition {
+	pattern := regexp.MustCompile(`(\d+):(\d+):(\d+)`)
+
+	times := pattern.FindStringSubmatch(position)
+	if times == nil {
+		return nil
+	}
+
+	pos := NewRelativePosition(parseInt(times[1]), parseInt(times[2]), parseInt(times[3]))
+	return &pos
+}
+
+// Parse int from string, ignore error and return 0
+func parseInt(val string) int {
+	if n, e := strconv.Atoi(val); e == nil {
+		return n
+	}
+
+	return 0
 }

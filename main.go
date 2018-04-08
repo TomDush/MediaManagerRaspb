@@ -16,49 +16,49 @@ var mmConfig *MmConfig
 
 // Run with ./rasbmm -stderrthreshold=INFO -v=3 for debug
 func main() {
-	var err error
-
 	mmConfig = new(MmConfig)
 	flag.StringVar(&mmConfig.www, "www", ".", "the directory to serve files from. Defaults to the current dir")
 	flag.IntVar(&mmConfig.port, "port", 8080, "port on which server is started. Defaults to 8080")
 	flag.StringVar(&mmConfig.roots, "roots", "", "(required) coma separated list of media directories")
 
 	flag.Parse()
-	err = mmConfig.IsValid()
-
-	if err == nil {
-		glog.Infoln("Bootstraping MediaManager designed for Raspberries...")
-
-		r := mux.NewRouter()
-		err = BrowserController(r)
-		if err == nil {
-			err = PayerController(r)
-		}
-		StaticController(r)
-
-		if err == nil {
-			srv := &http.Server{
-				Handler:      r,
-				Addr:         mmConfig.HostAndPort(),
-				WriteTimeout: 15 * time.Second,
-				ReadTimeout:  15 * time.Second,
-			}
-			srv.ListenAndServe()
-		}
-
-	}
-
-	if err != nil {
+	if err := mmConfig.IsValid(); err != nil {
 		glog.Fatal("Can not start server: " + err.Error())
 	}
+
+	glog.Infoln("Bootstraping MediaManager designed for Raspberries...")
+
+	r := mux.NewRouter()
+	if err := BrowserController(r); err != nil {
+		glog.Fatal("Can not start server: " + err.Error())
+	}
+
+	if err := PlayerController(r); err != nil {
+		glog.Fatal("Can not start server: " + err.Error())
+	}
+
+	if err := StaticController(r); err != nil {
+		glog.Fatal("Can not start server: " + err.Error())
+	}
+
+	srv := &http.Server{
+		Handler:      r,
+		Addr:         mmConfig.HostAndPort(),
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+	}
+	srv.ListenAndServe()
 }
 
 // Serve static files and /heath
-func StaticController(r *mux.Router) {
+func StaticController(r *mux.Router) error {
 	glog.V(1).Infoln("Add static controller endpoints")
 	r.HandleFunc("/health", healthCheck)
 
 	r.PathPrefix("/").HandlerFunc(WrapperFallBackIndex)
+
+	glog.Info("Static controller loaded")
+	return nil
 }
 // Always answer OK ;)
 func healthCheck(w http.ResponseWriter, _ *http.Request) {
