@@ -16,6 +16,7 @@ func PlayerController(r *mux.Router) error {
 	go mainDispatcher.StartDispatching()
 
 	// explicitly list commands that are accepted
+	r.PathPrefix("/api/player/status").HandlerFunc(HandlePlayerStatus)
 	for _, acceptableCmd := range []string{"play", "pause", "stop", "forward", "backward", "bigForward", "bigBackward"} {
 		r.PathPrefix("/api/player/" + acceptableCmd).HandlerFunc(commandHandler(mainDispatcher, acceptableCmd))
 	}
@@ -24,9 +25,22 @@ func PlayerController(r *mux.Router) error {
 	return nil
 }
 
+// Ask main dispatcher what is in progress
+func HandlePlayerStatus(w http.ResponseWriter, r *http.Request) {
+	if mainDispatcher == nil {
+		respondWithJSON(w, 500, map[string]string{"error": "Dispatcher is not started..."})
+	} else {
+		respondWithJSON(w, 200, mainDispatcher.PlayerStatus())
+	}
+}
+
 // Build and dispatch PlayerCommand
 func commandHandler(dispatcher *PlayerDispatcher, commandType string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			respondWithJSON(w, 404, map[string]string{"error": "Command requests must be done with POST method."})
+		}
+
 		cmd := NewPlayerCommand(commandType)
 
 		for k, val := range r.URL.Query() {
@@ -51,6 +65,8 @@ func commandHandler(dispatcher *PlayerDispatcher, commandType string) func(http.
 
 		// and dispatch!
 		dispatcher.commands <- cmd
+
+		respondWithJSON(w, 201, nil)
 	}
 }
 
@@ -97,6 +113,8 @@ type Player interface {
 	Accept(ext string) bool
 	// Execute requested command
 	Execute(command PlayerCommand) error
+	// Get player status (playing what and at what position, or not playing)
+	GetStatus() PlayerStatus
 }
 
 type PlayerDispatcher struct {
@@ -197,6 +215,13 @@ func (d *PlayerDispatcher) findAppropriatePlayer(file File) Player {
 	}
 
 	return nil
+}
+func (d *PlayerDispatcher) PlayerStatus() PlayerStatus {
+	if d.currentPlayer == nil {
+		return NotPlayingStatus()
+	}
+
+	return d.currentPlayer.GetStatus()
 }
 
 // Assert if media is playable by main dispatcher

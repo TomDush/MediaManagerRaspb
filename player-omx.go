@@ -85,6 +85,15 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 	return errors.New(fmt.Sprintf("Command %s is not implemented by OmxPlayer adapter.", command))
 }
 
+// Return status of OMX Player
+func (player *OmxPlayer) GetStatus() PlayerStatus {
+	if player.instance == nil {
+		return NotPlayingStatus()
+	}
+
+	return NewPlayerStatus(player.instance.playing, *player.instance.position)
+}
+
 // Playing instance of OMX Player
 type omxPlaying struct {
 	process  *exec.Cmd
