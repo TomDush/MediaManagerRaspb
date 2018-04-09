@@ -164,7 +164,6 @@ func (dir *Dir) loadChildren() error {
 
 	for _, file := range files {
 		filename := file.Name()
-		glog.Info("File name is: ", filename)
 		path := dir.path
 		newPath := path.Relative(filename)
 		f, err := newPath.ToFile(true)
