@@ -20,6 +20,10 @@ func (m *MockPlayer) Execute(command PlayerCommand) error {
 	args := m.Called(command)
 	return args.Error(0)
 }
+func (m *MockPlayer) GetStatus() PlayerStatus {
+	args := m.Called()
+	return args.Get(0).(PlayerStatus)
+}
 
 func TestDispatcher_Lookup(t *testing.T) {
 	p1 := new(MockPlayer)
