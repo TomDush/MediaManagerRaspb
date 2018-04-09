@@ -119,6 +119,11 @@ func NewPathFromId(fileId string) (Path, error) {
 
 // Serialise payload into JSON format, respond with 500 if can't serialise to JSON
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+	if payload == nil {
+		w.WriteHeader(code)
+		return
+	}
+
 	response, err := json.Marshal(payload)
 	glog.V(1).Infoln("Marshaled: ", string(response), " (payload=", payload, ")")
 

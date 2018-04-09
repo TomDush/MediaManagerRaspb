@@ -26,7 +26,7 @@ func PlayerController(r *mux.Router) error {
 }
 
 // Ask main dispatcher what is in progress
-func HandlePlayerStatus(w http.ResponseWriter, r *http.Request) {
+func HandlePlayerStatus(w http.ResponseWriter, _ *http.Request) {
 	if mainDispatcher == nil {
 		respondWithJSON(w, 500, map[string]string{"error": "Dispatcher is not started..."})
 	} else {
@@ -39,6 +39,7 @@ func commandHandler(dispatcher *PlayerDispatcher, commandType string) func(http.
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			respondWithJSON(w, 404, map[string]string{"error": "Command requests must be done with POST method."})
+			return
 		}
 
 		cmd := NewPlayerCommand(commandType)
