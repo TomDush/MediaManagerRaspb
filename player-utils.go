@@ -30,8 +30,8 @@ type PlayerStatus struct {
 	Media   FileDto `json:"media"`
 	Position struct {
 		Hours   int `json:"hours"`
-		Minutes int `json:"hours"`
-		Seconds int `json:"hours"`
+		Minutes int `json:"minutes"`
+		Seconds int `json:"seconds"`
 	} `json:"position"`
 }
 

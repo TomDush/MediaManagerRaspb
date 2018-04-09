@@ -53,20 +53,26 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 
 		case ope == "bigBackward":
 			player.instance.omxExec('\033', '[', 'B')
+
+		default:
+			if !playCmd {
+				return errors.New(fmt.Sprintf("Command %s is not implemented by OmxPlayer adapter.", command))
+			}
 		}
 	}
 
 	if playCmd {
 		glog.Info("Start to play ", command.File.Path().localPath)
 
-		process := exec.Command("omxplayer", "-o", "hdmi", command.File.Path().localPath)
-		reader, writer := io.Pipe()
-		process.Stdout = writer
-		process.Stderr = writer
+		process := exec.Command("stdbuf", "-oL", "-eL", "omxplayer", "-o", "hdmi", command.File.Path().localPath)
+		reader, _ := process.StdoutPipe()
+		process.Stderr = process.Stdout
 
+		initialPosition := NewRelativePosition(0, 0, 0)
 		player.instance = &omxPlaying{
-			playing: command.File,
-			process: process,
+			playing:  command.File,
+			process:  process,
+			position: &initialPosition,
 		}
 
 		// Start listening for updates (position in media)
@@ -82,12 +88,12 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 		}
 	}
 
-	return errors.New(fmt.Sprintf("Command %s is not implemented by OmxPlayer adapter.", command))
+	return nil
 }
 
 // Return status of OMX Player
 func (player *OmxPlayer) GetStatus() PlayerStatus {
-	if player.instance == nil {
+	if player.instance == nil || player.instance.position == nil {
 		return NotPlayingStatus()
 	}
 
@@ -109,12 +115,11 @@ func (player *omxPlaying) omxExec(key ...byte) {
 
 // Read OMX Player output
 func (player *omxPlaying) readOutput(scanner *bufio.Scanner) {
-	scanner.Split(bufio.ScanLines)
-
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		if strings.HasPrefix(line, "seek") {
+		glog.V(2).Info("OMX Output - ", line)
+		if strings.HasPrefix(line, "Seek") {
 			player.position = NewOmxRelativePosition(line)
 		}
 	}
