@@ -1,5 +1,7 @@
 # Media PI
 
+[![CircleCI](https://circleci.com/gh/TomDush/medima-pi.svg?style=svg)](https://circleci.com/gh/TomDush/medima-pi)
+
 Simple media manager for Raspberry PI 3 developed in GOLANG.
 
 ## Installation

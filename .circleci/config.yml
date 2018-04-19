@@ -1,0 +1,44 @@
+# Golang CircleCI 2.0 configuration file
+version: 2
+jobs:
+  test:
+    docker:
+      - image: tomdush/circleci-go-aws:1.9
+
+    working_directory: /go/src/github.com/tomdush/medima-pi
+    steps:
+      - checkout
+
+      - run: go get -v -t -d ./...
+      - run: go test -v ./...
+
+  build-n-deploy:
+    docker:
+      - image: tomdush/circleci-go-aws:1.9
+
+    working_directory: /go/src/github.com/tomdush/medima-pi
+    steps:
+      - checkout
+
+      - run: go get -v -t -d ./...
+
+      # Run tests and build binary before deploying to AWS S3
+      - run: make publish
+
+      - store_artifacts:
+          path: medima-pi
+          destination: raw-test-output
+
+workflows:
+  version: 2
+  build-deploy:
+    jobs:
+      - test:
+          filters:
+            branches:
+              ignore: master
+
+      - build-n-deploy:
+          filters:
+            branches:
+              only: master
