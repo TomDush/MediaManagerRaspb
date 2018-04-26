@@ -36,19 +36,20 @@ func Test_parseInt(t *testing.T) {
 func TestNewOmxRelativePosition(t *testing.T) {
 	type args struct {
 		position string
+		absolute bool
 	}
 	tests := []struct {
 		name        string
 		args        args
 		wantSeconds int
 	}{
-		{"it should extract the time part", args{"seek 01:10:20"}, 4220},
-		{"it should extract the time part when hours and minutes are nil", args{"seek 00:00:21"}, 21},
+		{"it should extract the time part", args{"seek 01:10:20", true}, 4220},
+		{"it should extract the time part when hours and minutes are nil", args{"seek 00:00:21", true}, 21},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewOmxRelativePosition(tt.args.position); got.seconds != tt.wantSeconds {
-				t.Errorf("NewOmxRelativePosition() = %v, want %v", got.seconds, tt.wantSeconds)
+			if got := NewOmxTimePosition(tt.args.position, tt.args.absolute); got.seconds != tt.wantSeconds {
+				t.Errorf("NewOmxTimePosition() = %v, want %v", got.seconds, tt.wantSeconds)
 			}
 		})
 	}
@@ -60,9 +61,10 @@ func Test_omxPlaying_readOutput(t *testing.T) {
 
 		reader, writer := io.Pipe()
 
+		calledBack := false
 		finished := make(chan bool)
 		go func() {
-			player.readOutput(bufio.NewScanner(reader))
+			player.readOutput(bufio.NewScanner(reader), func() { calledBack = true })
 			finished <- true
 		}()
 
@@ -72,6 +74,7 @@ func Test_omxPlaying_readOutput(t *testing.T) {
 		select {
 		case <-finished:
 			assert.Equal(t, player.position.seconds, 3723)
+			assert.Equal(t, calledBack, true)
 
 		case <-time.After(1 * time.Second):
 			assert.Fail(t, "Failure to end readOutput goroutine in time.")
@@ -86,7 +89,7 @@ func Test_omxPlaying_readOutput(t *testing.T) {
 
 		finished := make(chan bool)
 		go func() {
-			player.readOutput(bufio.NewScanner(reader))
+			player.readOutput(bufio.NewScanner(reader), func() {})
 			finished <- true
 		}()
 
@@ -104,7 +107,7 @@ func Test_omxPlaying_readOutput(t *testing.T) {
 				break found
 
 			default:
-				if player.position != nil && player.position.seconds == 3724 {
+				if player.position.seconds == 3724 {
 					break found
 
 				} else {

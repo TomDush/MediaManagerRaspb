@@ -285,3 +285,35 @@ func TestPath_Ext(t *testing.T) {
 		})
 	}
 }
+
+func TestPath_RealPath(t *testing.T) {
+	type fields struct {
+		localPath  string
+		Root       string
+		MiddlePath string
+		Name       string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{"extract path from full Path", fields{"/mnt/data/movies/Ironman.mp4", "data", "movies", "Ironman.mp4"}, "/mnt/data/movies"},
+		{"extract path when no middle path", fields{"/mnt/data/Ironman.mp4", "data", "", "Ironman.mp4"}, "/mnt/data"},
+		{"extract path when root", fields{"/mnt/data", "data", "", "Main Data Storage"}, "/mnt"},
+		{"extract path just a name", fields{"foobar", "data", "", "Foo"}, "foobar"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := &Path{
+				localPath:  tt.fields.localPath,
+				Root:       tt.fields.Root,
+				MiddlePath: tt.fields.MiddlePath,
+				Name:       tt.fields.Name,
+			}
+			if got := path.RealPath(); got != tt.want {
+				t.Errorf("Path.RealPath() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

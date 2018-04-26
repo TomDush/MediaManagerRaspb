@@ -23,19 +23,19 @@ func TestRelativePosition_GetPosition(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &RelativePosition{
+			p := &TimePosition{
 				seconds:  tt.fields.seconds,
 				captured: tt.fields.captured,
 			}
-			gotHour, gotMinute, gotSecond := p.GetPosition()
-			if gotHour != tt.wantHour {
-				t.Errorf("RelativePosition.GetPosition() gotHour = %v, want %v", gotHour, tt.wantHour)
+			pos := p.GetPosition()
+			if pos.Hours != tt.wantHour {
+				t.Errorf("TimePosition.GetPosition() gotHour = %v, want %v", pos.Hours, tt.wantHour)
 			}
-			if gotMinute != tt.wantMinute {
-				t.Errorf("RelativePosition.GetPosition() gotMinute = %v, want %v", gotMinute, tt.wantMinute)
+			if pos.Minutes != tt.wantMinute {
+				t.Errorf("TimePosition.GetPosition() gotMinute = %v, want %v", pos.Minutes, tt.wantMinute)
 			}
-			if gotSecond != tt.wantSecond && gotSecond != tt.wantSecond+1 {
-				t.Errorf("RelativePosition.GetPosition() gotSecond = %v, want %v", gotSecond, tt.wantSecond)
+			if pos.Seconds != tt.wantSecond && pos.Seconds != tt.wantSecond+1 {
+				t.Errorf("TimePosition.GetPosition() gotSecond = %v, want %v", pos.Seconds, tt.wantSecond)
 			}
 		})
 	}
@@ -43,22 +43,23 @@ func TestRelativePosition_GetPosition(t *testing.T) {
 
 func TestNewRelativePosition(t *testing.T) {
 	type args struct {
-		hours   int
-		minutes int
-		seconds int
+		hours    int
+		minutes  int
+		seconds  int
+		absolute bool
 	}
 	tests := []struct {
 		name string
 		args args
-		want RelativePosition
+		want TimePosition
 	}{
-		{"it should convert time into seconds", args{1, 22, 19}, RelativePosition{seconds: 4939}},
-		{"it should convert time into seconds", args{0, 0, 0}, RelativePosition{seconds: 0}},
+		{"it should convert time into seconds", args{1, 22, 19, true}, TimePosition{seconds: 4939}},
+		{"it should convert time into seconds", args{0, 0, 0, true}, TimePosition{seconds: 0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewRelativePosition(tt.args.hours, tt.args.minutes, tt.args.seconds); got.seconds != tt.want.seconds {
-				t.Errorf("NewRelativePosition() = %v, want %v", got, tt.want)
+			if got := NewTimePosition(tt.args.hours, tt.args.minutes, tt.args.seconds, tt.args.absolute); got.seconds != tt.want.seconds {
+				t.Errorf("NewTimePosition() = %v, want %v", got, tt.want)
 			}
 		})
 	}
