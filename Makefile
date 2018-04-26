@@ -1,4 +1,4 @@
-# Replace demo with your desired executable name
+# Cross platform GOLANG project build
 appname := medima-pi
 
 sources := $(wildcard *.go)
@@ -8,6 +8,8 @@ tar = cd build && tar -cvzf $(appname)-$(1)-$(2).tar.gz $(appname)$(3) VERSION m
 zip = cd build && zip $(appname)-$(1)-$(2).zip $(appname)$(3) VERSION medima-pi.service && rm $(appname)$(3)
 
 .PHONY: all windows darwin linux clean
+
+DEST?=dush@192.168.0.11:~/medima
 
 all: mini
 mini: build/medima-pi-linux-amd64.tar.gz build/medima-pi-linux-arm.tar.gz
@@ -22,6 +24,9 @@ version: $(sources)
 	mkdir -p build
 	echo `date +'%Y%m%d%H%M%S'` > build/VERSION
 	cp linux/medima-pi.service build/
+
+snapshot: all
+	scp build/medima-pi-linux-arm.tar.gz $(DEST)
 
 ##### LINUX BUILDS #####
 linux: build/medima-pi-linux-arm.tar.gz build/medima-pi-linux-arm64.tar.gz build/medima-pi-linux-386.tar.gz build/medima-pi-linux-amd64.tar.gz
