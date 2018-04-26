@@ -48,6 +48,7 @@ type FileDto struct {
 	PathId   string `json:"pathId"`
 	ParentId string `json:"parentId"`
 	Name     string `json:"name"`
+	RealPath string `json:"realPath"`
 
 	// Specific for directories
 	Children []FileDto `json:"children,omitempty"`
@@ -62,6 +63,7 @@ func NewFileDto(file File) FileDto {
 		PathId:   file.Path().PathId(),
 		ParentId: file.Path().ParentId(),
 		Name:     file.Path().DisplayName(),
+		RealPath: file.Path().RealPath(),
 	}
 
 	if dir, ok := file.(*Dir); ok {

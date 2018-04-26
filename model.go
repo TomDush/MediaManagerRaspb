@@ -116,6 +116,14 @@ func (path *Path) ToFile(summarised bool) (File, error) {
 		}
 	}
 }
+func (path *Path) RealPath() string {
+	nameIndex := strings.LastIndex(path.localPath, "/")
+	if nameIndex > 0 {
+		return path.localPath[:nameIndex]
+	} else {
+		return path.localPath
+	}
+}
 
 type File interface {
 	Path() *Path

@@ -23,7 +23,7 @@ func NewOmxPlayer() *OmxPlayer {
 // Film files are playable
 func (player *OmxPlayer) Accept(ext string) bool {
 	lext := strings.ToLower(ext)
-	return lext == "mkv" || lext == "mp4" || lext == "avi"
+	return lext == "mkv" || lext == "mp4" || lext == "avi" || lext == "mov"
 }
 
 func (player *OmxPlayer) Execute(command PlayerCommand) error {
@@ -41,6 +41,7 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 
 		case ope == "pause":
 			player.instance.omxExec('p')
+			player.instance.TogglePause()
 
 		case ope == "forward":
 			player.instance.omxExec('\033', '[', 'C')
@@ -53,24 +54,34 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 
 		case ope == "bigBackward":
 			player.instance.omxExec('\033', '[', 'B')
+
+		default:
+			return errors.New(fmt.Sprintf("Command %s is not implemented by OmxPlayer adapter.", command))
 		}
 	}
 
 	if playCmd {
-		glog.Info("Start to play ", command.File.Path().localPath)
+		file := command.File.Path().localPath
+		glog.Info("Start to play ", file)
 
-		process := exec.Command("omxplayer", "-o", "hdmi", command.File.Path().localPath)
+		process := exec.Command("omxplayer", "-o", "hdmi", file)
 		reader, writer := io.Pipe()
 		process.Stdout = writer
 		process.Stderr = writer
 
 		player.instance = &omxPlaying{
-			playing: command.File,
-			process: process,
+			playing:  command.File,
+			process:  process,
+			position: NewTimePosition(0, 0, 0, false),
+			Length:   NewTimePosition(0, 0, 0, true),
 		}
 
 		// Start listening for updates (position in media)
-		go player.instance.readOutput(bufio.NewScanner(reader))
+		go player.instance.readOutput(bufio.NewScanner(reader), func() {
+			glog.Info("Finished to play ", file)
+			player.instance = nil
+		})
+		go player.instance.readMediaLength(file)
 
 		var err error
 		if player.instance.stdin, err = process.StdinPipe(); err != nil {
@@ -82,7 +93,7 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 		}
 	}
 
-	return errors.New(fmt.Sprintf("Command %s is not implemented by OmxPlayer adapter.", command))
+	return nil;
 }
 
 // Return status of OMX Player
@@ -91,7 +102,7 @@ func (player *OmxPlayer) GetStatus() PlayerStatus {
 		return NotPlayingStatus()
 	}
 
-	return NewPlayerStatus(player.instance.playing, *player.instance.position)
+	return NewPlayerStatus(player.instance.playing, player.instance.Paused, player.instance.position, player.instance.Length)
 }
 
 // Playing instance of OMX Player
@@ -99,7 +110,10 @@ type omxPlaying struct {
 	process  *exec.Cmd
 	playing  File
 	stdin    io.WriteCloser
-	position *RelativePosition
+	position TimePosition
+
+	Paused bool
+	Length TimePosition
 }
 
 // Pass a command (key) to OMX Player
@@ -108,29 +122,62 @@ func (player *omxPlaying) omxExec(key ...byte) {
 }
 
 // Read OMX Player output
-func (player *omxPlaying) readOutput(scanner *bufio.Scanner) {
+func (player *omxPlaying) readOutput(scanner *bufio.Scanner, callback func()) {
 	scanner.Split(bufio.ScanLines)
 
 	for scanner.Scan() {
 		line := scanner.Text()
 
 		if strings.HasPrefix(line, "seek") {
-			player.position = NewOmxRelativePosition(line)
+			player.position = NewOmxTimePosition(line, false)
+		}
+	}
+
+	callback()
+}
+
+// Use ffmepg to get media length
+func (player *omxPlaying) readMediaLength(file string) {
+
+	process := exec.Command("ffmpeg", "-i", file)
+	reader, writer := io.Pipe()
+	process.Stdout = writer
+	process.Stderr = writer
+
+	if err := process.Start(); err != nil {
+		glog.Error("Can't determine media length with ffmpeg (start): ", err)
+	}
+
+	scanner := bufio.NewScanner(reader)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		glog.V(2).Info("[ffmpeg] stdout: ", line)
+
+		if strings.Index(line, "Duration") >= 0 {
+			player.Length = NewOmxTimePosition(line, true)
+			glog.Info("Media ", file, " length is ", player.Length)
 		}
 	}
 }
 
+// Toggle pause and fix position to not keep it running
+func (player *omxPlaying) TogglePause() {
+	player.Paused = !player.Paused
+	player.position = player.position.Absolute(player.Paused)
+}
+
 // Parse "seek" line from OMX Player output
-func NewOmxRelativePosition(position string) *RelativePosition {
+func NewOmxTimePosition(line string, absolute bool) TimePosition {
 	pattern := regexp.MustCompile(`(\d+):(\d+):(\d+)`)
 
-	times := pattern.FindStringSubmatch(position)
+	times := pattern.FindStringSubmatch(line)
 	if times == nil {
-		return nil
+		return NewTimePosition(0, 0, 0, absolute)
 	}
 
-	pos := NewRelativePosition(parseInt(times[1]), parseInt(times[2]), parseInt(times[3]))
-	return &pos
+	return NewTimePosition(parseInt(times[1]), parseInt(times[2]), parseInt(times[3]), absolute)
 }
 
 // Parse int from string, ignore error and return 0
