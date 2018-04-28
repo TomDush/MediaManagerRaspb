@@ -43,7 +43,7 @@ func TestNewOmxRelativePosition(t *testing.T) {
 		args        args
 		wantSeconds int
 	}{
-		{"it should extract the time part", args{"seek 01:10:20", true}, 4220},
+		{"it should extract the time part", args{"Seek 01:10:20", true}, 4220},
 		{"it should extract the time part when hours and minutes are nil", args{"seek 00:00:21", true}, 21},
 	}
 	for _, tt := range tests {
@@ -68,17 +68,17 @@ func Test_omxPlaying_readOutput(t *testing.T) {
 			finished <- true
 		}()
 
-		writer.Write([]byte("seek 01:02:03"))
+		writer.Write([]byte("Seek 01:02:03"))
 		writer.Close()
 
 		select {
 		case <-finished:
-			assert.Equal(t, player.position.seconds, 3723)
-			assert.Equal(t, calledBack, true)
+			assert.Equal(t, 3723, player.position.seconds)
+			assert.Equal(t, true, calledBack)
 
 		case <-time.After(1 * time.Second):
 			assert.Fail(t, "Failure to end readOutput goroutine in time.")
-			assert.Equal(t, player.position.seconds, 3723)
+			assert.Equal(t, 3723, player.position.seconds)
 		}
 	})
 
@@ -93,7 +93,7 @@ func Test_omxPlaying_readOutput(t *testing.T) {
 			finished <- true
 		}()
 
-		writer.Write([]byte("seek 01:0"))
+		writer.Write([]byte("Seek 01:0"))
 		writer.Write([]byte("2:04\n"))
 
 		// wait position to be updated
@@ -118,7 +118,7 @@ func Test_omxPlaying_readOutput(t *testing.T) {
 
 		writer.Write([]byte("foo bar 5'20\"\n"))
 		writer.Write([]byte("foo bar 01:02:05\n"))
-		writer.Write([]byte("seek 01:02:06\n"))
+		writer.Write([]byte("Seek 01:02:06\n"))
 		writer.Write([]byte("eek 01:02:07\n"))
 		writer.Close()
 

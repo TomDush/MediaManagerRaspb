@@ -64,10 +64,9 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 		file := command.File.Path().localPath
 		glog.Info("Start to play ", file)
 
-		process := exec.Command("omxplayer", "-o", "hdmi", file)
-		reader, writer := io.Pipe()
-		process.Stdout = writer
-		process.Stderr = writer
+		process := exec.Command("stdbuf", "-oL", "-eL", "omxplayer", "-o", "hdmi", file)
+		reader, _ := process.StdoutPipe()
+		process.Stderr = process.Stdout
 
 		player.instance = &omxPlaying{
 			playing:  command.File,
@@ -77,9 +76,12 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 		}
 
 		// Start listening for updates (position in media)
+		current := player.instance
 		go player.instance.readOutput(bufio.NewScanner(reader), func() {
 			glog.Info("Finished to play ", file)
-			player.instance = nil
+			if player.instance == current {
+				player.instance = nil
+			}
 		})
 		go player.instance.readMediaLength(file)
 
@@ -93,7 +95,7 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 		}
 	}
 
-	return nil;
+	return nil
 }
 
 // Return status of OMX Player
@@ -123,12 +125,11 @@ func (player *omxPlaying) omxExec(key ...byte) {
 
 // Read OMX Player output
 func (player *omxPlaying) readOutput(scanner *bufio.Scanner, callback func()) {
-	scanner.Split(bufio.ScanLines)
-
 	for scanner.Scan() {
 		line := scanner.Text()
+		glog.V(2).Info("[omxplayer] stdout: ", line)
 
-		if strings.HasPrefix(line, "seek") {
+		if strings.HasPrefix(line, "Seek") {
 			player.position = NewOmxTimePosition(line, false)
 		}
 	}
@@ -140,9 +141,8 @@ func (player *omxPlaying) readOutput(scanner *bufio.Scanner, callback func()) {
 func (player *omxPlaying) readMediaLength(file string) {
 
 	process := exec.Command("ffmpeg", "-i", file)
-	reader, writer := io.Pipe()
-	process.Stdout = writer
-	process.Stderr = writer
+	reader, _ := process.StdoutPipe()
+	process.Stderr = process.Stdout
 
 	if err := process.Start(); err != nil {
 		glog.Error("Can't determine media length with ffmpeg (start): ", err)
@@ -160,6 +160,8 @@ func (player *omxPlaying) readMediaLength(file string) {
 			glog.Info("Media ", file, " length is ", player.Length)
 		}
 	}
+
+	glog.V(2).Info("ffmpeg goroutine ends.")
 }
 
 // Toggle pause and fix position to not keep it running

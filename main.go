@@ -48,7 +48,7 @@ func main() {
 	srv := &http.Server{
 		Handler:      r,
 		Addr:         mmConfig.HostAndPort(),
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 5 * time.Minute, // Search module is pretty slow!
 		ReadTimeout:  15 * time.Second,
 	}
 	srv.ListenAndServe()
