@@ -93,7 +93,7 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 		}
 	}
 
-	return nil;
+	return nil
 }
 
 // Return status of OMX Player
@@ -127,6 +127,7 @@ func (player *omxPlaying) readOutput(scanner *bufio.Scanner, callback func()) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
+		glog.V(2).Info("[omxplayer] stdout: ", line)
 
 		if strings.HasPrefix(line, "seek") {
 			player.position = NewOmxTimePosition(line, false)
@@ -160,6 +161,8 @@ func (player *omxPlaying) readMediaLength(file string) {
 			glog.Info("Media ", file, " length is ", player.Length)
 		}
 	}
+
+	glog.V(2).Info("ffmpeg goroutine ends.")
 }
 
 // Toggle pause and fix position to not keep it running
