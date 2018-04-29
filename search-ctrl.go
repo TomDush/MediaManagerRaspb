@@ -16,7 +16,7 @@ import (
 func SearchController(r *mux.Router) error {
 	glog.V(1).Infoln("Registering Search Controller")
 
-	r.PathPrefix("/api/search").HandlerFunc(SearchMedia)
+	r.PathPrefix("/api/search").Queries("pattern", "").HandlerFunc(SearchMedia)
 
 	return nil
 }
@@ -117,10 +117,22 @@ func (s *fileSearch) walkThrow(root string, rootPath string, acceptanceCriteria 
 	defer group.Done()
 
 	err := filepath.Walk(rootPath, func(path string, f os.FileInfo, err error) error {
-		if !f.IsDir() && acceptanceCriteria(f.Name()) {
+		switch {
+		case f == nil:
+			glog.Warning("Can't stats file '"+path+"': ", err)
+			return nil
+
+		case f.IsDir() && strings.HasPrefix(path, "."):
+			// Skip hidden files
+			return filepath.SkipDir
+
+		case !f.IsDir() && acceptanceCriteria(f.Name()):
 			s.foundFileIds <- root + "/" + strings.Trim(strings.TrimPrefix(path, rootPath), "/")
+			return nil
+
+		default:
+			return nil
 		}
-		return nil
 	})
 
 	if err != nil {
@@ -184,6 +196,7 @@ func (s *fileSearch) buildResponse(response chan []FileDto) {
 	}
 
 	response <- medias
+	glog.Info("Ends of buildResponse")
 }
 
 func loadBatch(buffer [64]string, length int, files chan File) {

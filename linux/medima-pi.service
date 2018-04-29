@@ -8,4 +8,4 @@ WantedBy=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/medima-pi -roots unsafe:/mnt/seed/,data:/mnt/data -stderrthreshold=INFO -port 80 -www /srv/medima/www
+ExecStart=/usr/bin/medima-pi -roots unsafe:/mnt/seed,data:/mnt/data/Media -stderrthreshold=INFO -port 80 -www /srv/medima/www

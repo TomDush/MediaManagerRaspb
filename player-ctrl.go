@@ -18,7 +18,9 @@ func PlayerController(r *mux.Router) error {
 	// explicitly list commands that are accepted
 	r.PathPrefix("/api/player/status").HandlerFunc(HandlePlayerStatus)
 	for _, acceptableCmd := range []string{"play", "pause", "stop", "forward", "backward", "bigForward", "bigBackward"} {
-		r.PathPrefix("/api/player/" + acceptableCmd).HandlerFunc(commandHandler(mainDispatcher, acceptableCmd))
+		r.Methods("POST").
+			PathPrefix("/api/player/" + acceptableCmd).
+			HandlerFunc(commandHandler(mainDispatcher, acceptableCmd))
 	}
 
 	glog.Info("Player controller loaded with ", len(mainDispatcher.Players), " players")
@@ -37,11 +39,6 @@ func HandlePlayerStatus(w http.ResponseWriter, _ *http.Request) {
 // Build and dispatch PlayerCommand
 func commandHandler(dispatcher *PlayerDispatcher, commandType string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			respondWithJSON(w, 404, map[string]string{"error": "Command requests must be done with POST method."})
-			return
-		}
-
 		cmd := NewPlayerCommand(commandType)
 
 		for k, val := range r.URL.Query() {

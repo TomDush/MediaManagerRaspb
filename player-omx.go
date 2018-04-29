@@ -76,9 +76,12 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 		}
 
 		// Start listening for updates (position in media)
+		current := player.instance
 		go player.instance.readOutput(bufio.NewScanner(reader), func() {
 			glog.Info("Finished to play ", file)
-			player.instance = nil
+			if player.instance == current {
+				player.instance = nil
+			}
 		})
 		go player.instance.readMediaLength(file)
 
@@ -97,7 +100,7 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 
 // Return status of OMX Player
 func (player *OmxPlayer) GetStatus() PlayerStatus {
-	if player.instance == nil || player.instance.position == nil {
+	if player.instance == nil {
 		return NotPlayingStatus()
 	}
 
