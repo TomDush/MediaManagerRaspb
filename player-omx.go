@@ -64,7 +64,7 @@ func (player *OmxPlayer) Execute(command PlayerCommand) error {
 		file := command.File.Path().localPath
 		glog.Info("Start to play ", file)
 
-		process := exec.Command("stdbuf", "-oL", "-eL", "omxplayer", "-o", "hdmi", file)
+		process := exec.Command("stdbuf", "-oL", "-eL", "omxplayer", "-b", "-o", "hdmi", file)
 		reader, _ := process.StdoutPipe()
 		process.Stderr = process.Stdout
 
