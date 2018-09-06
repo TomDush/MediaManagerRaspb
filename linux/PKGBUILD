@@ -3,7 +3,7 @@
 
 pkgname=medima-pi
 pkgdesc="medima PI is a light medima manager for Raspberry PI"
-arch=('x86_64' 'armv7h')
+arch=('x86_64' 'armv7h' 'aarch64')
 url="https://github.com/TomDush/medima-pi"
 pkgver=0.1
 pkgrel=1
@@ -13,9 +13,12 @@ replaces=('media-pi')
 
 source_armv7h=("https://s3-eu-west-1.amazonaws.com/dush-public/medima-pi/medima-pi-linux-arm.tar.gz"
                 "https://s3-eu-west-1.amazonaws.com/dush-public/medima-pi/medima-pi-ui.tar.gz")
+source_aarch64=("https://s3-eu-west-1.amazonaws.com/dush-public/medima-pi/medima-pi-linux-arm64.tar.gz"
+                "https://s3-eu-west-1.amazonaws.com/dush-public/medima-pi/medima-pi-ui.tar.gz")
 source_x86_64=("https://s3-eu-west-1.amazonaws.com/dush-public/medima-pi/medima-pi-linux-amd64.tar.gz"
                 "https://s3-eu-west-1.amazonaws.com/dush-public/medima-pi/medima-pi-ui.tar.gz")
 md5sums_armv7h=('SKIP' 'SKIP')
+md5sums_aarch64=('SKIP' 'SKIP')
 md5sums_x86_64=('SKIP' 'SKIP')
 
 noextract=('medima-pi-ui.tar.gz')

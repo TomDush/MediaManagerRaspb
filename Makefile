@@ -12,7 +12,7 @@ zip = cd build && zip $(appname)-$(1)-$(2).zip $(appname)$(3) VERSION medima-pi.
 DEST?=dush@192.168.0.11:~/medima
 
 all: mini
-mini: build/medima-pi-linux-amd64.tar.gz build/medima-pi-linux-arm.tar.gz
+mini: build/medima-pi-linux-amd64.tar.gz build/medima-pi-linux-arm.tar.gz build/medima-pi-linux-arm64.tar.gz
 
 clean:
 	rm -rf build/ medima-pi
