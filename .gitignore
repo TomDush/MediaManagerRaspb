@@ -23,3 +23,6 @@ rasbmm
 .glide/
 
 build/
+
+# dep - recreate it using 'dep ensure'
+vendor/

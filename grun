@@ -1,1 +1,2 @@
-go run *.go -stderrthreshold=INFO -v=3 -www /srv/raspbmm/www/ -roots  local:/mnt/local/Media/,unsafe:/mnt/unsafe
+#!/bin/bash
+go run $(ls *.go |grep -v '_test.go') -stderrthreshold=INFO -v=3 -www /srv/raspbmm/www/ -roots  local:"${MEDIMA_LOCAL:-$HOME}"
